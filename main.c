@@ -33,30 +33,62 @@ void enableEditMode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH ,&edit);
 }
 
+// If a file isnt provided as an argument, then this function creates a file 
+// with our predetermined naming convention.
+char *create_default_file() {
+    static char fname[256];
+    int index = 0;
+
+    // Loops until we find a filename that doesn't exist, returns that name 
+    while (1) {
+        if (index == 0) 
+            snprintf(fname, sizeof(fname), "newvoid.txt");
+        else 
+            snprintf(fname, sizeof(fname), "newvoid%d.txt", index);
+
+        FILE *fd = fopen(fname, "r");
+        if (!fd) 
+            break;
+        
+        fclose(fd);
+        index++;
+    }
+    return fname;
+}
+
 
 int main(int argc, char *argv[]) {
     char **filelines = NULL; 
-    char *filename;
+    char *filename = NULL;
     int numline = 0;
     FILE *fd;
 
     // Get the file from the command line 
     if (argc > 1) {
-        // save the filename to a variable
-        filename = argv[1]; 
+        // Save the passed in filename to a variable and try open it 
+        filename = argv[1];
         fd = fopen(filename, "r");
-         
-    } 
-    // User forgot to add file in args list on launch
-    else {
-        fprintf(stderr, "Error: No file provided\n");
-        return 1;
-    }
 
-    // fd is not a valid file pointer
-    if (fd == NULL) {
-        fprintf(stderr, "Error: Could not open file");
-        return 1;
+        // If it failed to open, file doesn't exist, create it
+        if (!fd)
+            fd = fopen(filename, "w");
+        
+        // If it failed to create, exit 
+        // SEEMS ERROR PRONE WITH STRING FORMAT INJECTION ATTACK? 
+        if (!fd) {
+            fprintf(stderr, "Error: unable to create file %s\n", filename);
+            return 1;
+        }
+    } 
+    // If a file wasn't provided, create on to start writing in
+    else {
+        filename = create_default_file();
+        fd = fopen(filename, "w");
+
+        if (!fd) {
+            fprintf(stderr, "Error: unable to create file %s\n", filename);
+            return 1;
+        }
     }
 
     // Iterate through all lines of the file, saving them to a 2d array and 
@@ -82,11 +114,17 @@ int main(int argc, char *argv[]) {
     free(line);
     fclose(fd);
 
+    // Check to see if a line is empty, if it is, then add a blank line to avoid 
+    // "getline" reading memory that it shouldnt
+    if (numline == 0) {
+        filelines = malloc(sizeof(char*));
+        filelines[0] = strdup("");
+        numline++;
+    }
+
     // Print each line to the terminal
     for (int i = 0; i < numline; i++) 
         printf("%s", filelines[i]);
-
-
 
     // Enter the terminal into rawMode for single char processing 
     enableEditMode();

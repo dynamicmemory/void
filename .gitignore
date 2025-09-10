@@ -1,2 +1,5 @@
 # Current project binary
 void
+
+# Any text files generated during testing 
+*.txt
