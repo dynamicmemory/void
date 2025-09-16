@@ -62,25 +62,30 @@ void draw_status_bar(session *s) {
     printf("\x1b[0m");
 }
 
-// void viewport(session *s) {
-//     int screen_rows, screen_cols;
-//     get_window_size(&screen_rows, &screen_cols);
-//
-//     if (s->row < screen_rows) 
-//         s->row_offset = s->row;
-//     else if (s->row >= s->row_offset + screen_rows) 
-//         s->row_offset = s->row - screen_rows + 2;
-//
-//     if (s->col < screen_cols) 
-//         s->col_offset = s->col;
-//     if (s->col >= s->col_offset + screen_cols)
-//         s->col_offset = s->col - screen_cols + 1;
-//
-//     for (int i = 0; i < screen_rows; i++) {
-//         int file_row = i + s->row_offset;
-//         if (file_row >= s->nlines) 
-//             printf("~\r\n");
-//         else 
-//             printf("%.*s\r\n", screen_cols, s->file[file_row] + s->col_offset);
-//     }
-// }
+void viewport(session *s) {
+    int screen_rows, screen_cols;
+    get_window_size(&screen_rows, &screen_cols);
+
+    screen_rows = screen_rows - 1;
+
+    // setting the vertical offset for the viewport
+    if (s->row < s->row_offset) 
+        s->row_offset = s->row;
+    else if (s->row >= s->row_offset + screen_rows - 1) 
+        s->row_offset = s->row - (screen_rows - 1);
+
+    // setting the horizontal offset for the viewport
+    if (s->col < s->col_offset) 
+        s->col_offset = s->col;
+    if (s->col >= s->col_offset + screen_cols)
+        s->col_offset = s->col - screen_cols + 1;
+
+    // Printing the file to the screen
+    for (int i = 0; i < screen_rows; i++) {
+        int file_row = i + s->row_offset;
+        if (file_row >= s->nlines) 
+            printf("~\r\n");
+        else 
+            printf("%.*s\r\n", screen_cols, s->file[file_row] + s->col_offset);
+    }
+}

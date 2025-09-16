@@ -18,8 +18,8 @@ void init_file(session *s, char **argv) {
     s->file = NULL;
     s->col_offset = 0;
     s->row_offset = 0;
-    read_file(fd, &s->nlines, &s->file);
     s->row = s->col = 0;
+    read_file(fd, &s->nlines, &s->file);
     s->dirty = 0;
 }
 

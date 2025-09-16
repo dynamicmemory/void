@@ -17,13 +17,13 @@ void print_to_screen(session *s) {
     clear_screen(); // Clear the screen 
     move_cursor(0, 0); // Move the cursor to the top left to reprint all lines 
 
-    // viewport(s);
-    for (int i = 0; i < s->nlines; i++) {
-        printf("%s\r\n", s->file[i]); 
-    }
+    viewport(s);
+    // for (int i = 0; i < s->nlines; i++) {
+    //     printf("%s\r\n", s->file[i]); 
+    // }
     draw_status_bar(s);
-
-    move_cursor(s->row + 1, s->col + 1); // Adding one to both for 0 index offset
+    move_cursor(s->row - s->row_offset + 1, s->col - s->col_offset + 1);
+    // move_cursor(s->row + 1, s->col + 1); // Adding one to both for 0 index offset
     fflush(stdout);
 }
 
