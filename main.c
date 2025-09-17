@@ -1,12 +1,7 @@
-// TODO: Turning off and on cursor to stop it from flickering during page rewrite
-// TODO: Using a buffer to write changes rather then making sys calls 
-//       endlessly per input 
-// TODO: Make sure all lines are null terminated as writing past col limit on 
-//       a single line causes random chars to appear on other lines.
-
 #include "session.h"
-#include "state.h"
+#include "sysops.h"
 #include "input.h"
+#include "display.h"
 #include <unistd.h>
 
 int main(int argc, char *argv[]) {

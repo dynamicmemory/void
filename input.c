@@ -1,57 +1,10 @@
+#include "session.h"
+#include "file.h"
+#include "display.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include "session.h"
-#include "file.h"
-#include "statusbar.h"
-
-// Clears the terminal screen completely
-void clear_screen() { printf("\x1b[2J"); }
-
-// Moves the cursor to the given row and column
-void move_cursor(int row, int col) { printf("\x1b[%d;%dH", row, col); }
-
-// Reprints the screen after every char input
-void print_to_screen(session *s) {
-    clear_screen(); // Clear the screen 
-    move_cursor(0, 0); // Move the cursor to the top left to reprint all lines 
-
-    viewport(s);
-    // for (int i = 0; i < s->nlines; i++) {
-    //     printf("%s\r\n", s->file[i]); 
-    // }
-    draw_status_bar(s);
-    move_cursor(s->row - s->row_offset + 1, s->col - s->col_offset + 1);
-    // move_cursor(s->row + 1, s->col + 1); // Adding one to both for 0 index offset
-    fflush(stdout);
-}
-
-void cursor_handler(session *s) {
-    char seq[2];
-
-    // Two chars for an arrow press, not just one
-    if (read(STDIN_FILENO, &seq[0], 1) != 1) return;
-    if (read(STDIN_FILENO, &seq[1], 1) != 1) return;
-    // Add or subtract one for the cursor movement
-    if (seq[0] == '[') {
-        switch(seq[1]) {
-            case 'A': if (s->row > 0) {
-                        s->row--;
-                        break;
-            }
-            case 'B': if (s->row < s->nlines -1) {
-                        s->row++;
-                        break;
-            }
-            case 'C': s->col++; break;
-            case 'D': if (s->col > 0) {
-                        s->col--;
-                        break;
-            }
-        }
-    }
-}
 
 void insert_char(session *s, char c) {
     char *line = s->file[s->row];

@@ -1,8 +1,8 @@
-void: main.c session.c state.c input.c file.c statusbar.c
-	gcc main.c session.c state.c input.c file.c statusbar.c -o void
+void: main.c session.c input.c file.c sysops.c display.c
+	gcc main.c session.c input.c file.c sysops.c display.c -o void
 
-test: main.c session.c state.c input.c file.c statusbar.c
-	gcc main.c session.c state.c input.c file.c statusbar.c -o test
+# test: main.c session.c input.c file.c sysops.c display.c
+# 	gcc main.c session.c input.c file.c sysops.c display.c -o test
 
 clean:
-	rm -rf void refactor *.txt
+	rm -rf void test *.txt
