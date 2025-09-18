@@ -97,7 +97,7 @@ void newline(session *s) {
 }
 
 void input_manager(session *s, char c) {
-    if (read(STDIN_FILENO, &c, 1) == 1) {
+
         if (c == CTRL_Q) exit(0);
         if (c == CTRL_S) { save_file(s->file, s->fname, s->nlines); s->dirty = 0;}
         // Handles where the cursor is and the arrow key presses
@@ -109,5 +109,4 @@ void input_manager(session *s, char c) {
         if (c >= 32 && c <= 126) insert_char(s, c);
         if (c == 127) backspace(s);
         if (c == '\n' || c == '\r') newline(s);
-    }
 }
