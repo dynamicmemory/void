@@ -1,6 +1,10 @@
 # Current project binary
 void
 test
+main
 
 # Any text files generated during testing 
 *.txt
+
+src/newvoid*
+
