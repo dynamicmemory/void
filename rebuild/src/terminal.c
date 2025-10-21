@@ -1,6 +1,5 @@
 #include <termios.h>
 #include <unistd.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 struct termios original_terminal;
@@ -9,7 +8,6 @@ struct termios original_terminal;
 void disableRaw() {
     tcsetattr(STDIN_FILENO, TCSANOW, &original_terminal);
 }
-
 
 /*
  * Switches of all controls in the terminal once the editor is running, this is 
@@ -23,11 +21,14 @@ void enableRaw() {
     // Disables auto echoing of keys, line buffering input, ctrl+c,z,o,v
     raw.c_lflag &= ~(ECHO | ICANON | ISIG | IEXTEN); 
     // Disables ctrl+s,q, returns, newlines, interupts, stripping of 8bit inputs 
-    raw.c_lflag &= ~(IXON | ICRNL | BRKINT | INPCK | ISTRIP);
+    raw.c_iflag &= ~(IXON | ICRNL | BRKINT | INPCK | ISTRIP);
     // Disables output processing 
-    raw.c_lflag &= ~(OPOST);
+    raw.c_oflag &= ~(OPOST);
     // Sets 8bit chars to ensure full utf8
-    raw.c_lflag |= (CS8);
+    raw.c_cflag |= (CS8);
+    raw.c_cc[VMIN] = 1;
+    raw.c_cc[VTIME] = 0;
+
 
     tcsetattr(STDIN_FILENO, TCSANOW, &raw);
 }

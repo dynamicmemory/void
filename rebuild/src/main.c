@@ -1,4 +1,3 @@
-#include <inttypes.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,6 +5,14 @@
 #include <unistd.h>
 #include "../include/document.h"
 #include "../include/terminal.h"
+
+#define CTRL_QUIT 17
+#define CTRL_SAVE 19
+
+typedef struct editor {
+    int row;
+    int col;
+} editor;
 
 void render_display(document *d);
 
@@ -24,6 +31,14 @@ int main(int argc, char *argv[]) {
     }
     
     render_display(&d);
+
+    int c;
+    while ((c=getc(stdin)) != EOF) {
+        if (c == CTRL_QUIT) exit(0);
+        if (c == CTRL_SAVE) exit(0);  // TODO: Change to save shortly
+       
+        
+    }
 
     // --- TODO ---
     // Read in a file  DONE  
@@ -64,6 +79,8 @@ void render_display(document *d) {
             size++;
             p++;
         }
+        buffer[size] = '\r';
+        size++;
         buffer[size] = '\n';
         size++;
     }
@@ -71,7 +88,7 @@ void render_display(document *d) {
     // Chars for unhiding the cursor
     char *showc = "\x1b[?25h";
     int showlen = strlen(showc);
-    memcpy(buffer, showc, showlen);
+    memcpy(buffer + size, showc, showlen);
     size += showlen;
 
     write(STDOUT_FILENO, buffer, size);
