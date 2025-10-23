@@ -8,6 +8,8 @@
 
 #define CTRL_QUIT 17
 #define CTRL_SAVE 19
+#define ENTER 0
+#define BACKSPACE 0
 
 typedef struct editor {
     int row;
@@ -15,8 +17,8 @@ typedef struct editor {
 } editor;
 
 void init_editor(editor *e) {
-    e->row = 0;
-    e->col = 0;
+    e->row = 1;
+    e->col = 1;
 }
 
 void render_display(document *d, editor *e);
@@ -38,30 +40,54 @@ int main(int argc, char *argv[]) {
     editor e;
     init_editor(&e);
     
-    // render_display(&d, &e);
+    render_display(&d, &e);
 
     int c;
-    while ((c=getc(stdin)) != EOF) {
-        render_display(&d, &e);
+    while (read(0, &c, 1) == 1) {
+        
         if (c == CTRL_QUIT) exit(0);
         if (c == CTRL_SAVE) exit(0);  // TODO: Change to save shortly
-         
-        // Cursor related code 
+
+        // Char input 
+        if (c >= 32 && c <= 126) {
+            char *line = d.lines[e.row-1];
+            size_t len = strlen(line);
+
+            d.lines[e.row-1] = realloc(line, len+2);
+            line = d.lines[e.row-1];
+
+            memmove(&line[e.col+1], 
+                    &line[e.col], 
+                    len - e.col+1);
+
+            line[e.col] = c; 
+            e.col++;
+        }
+
+        if (c == BACKSPACE) exit(0);
+        if (c == ENTER) exit(0);
+        
+        // Cursor moving related code 
         if (c == '\x1b') {
             char two_chars[2];
-            if (read(0, two_chars, 1) == 0) continue;
-            if (read(0, two_chars + 1, 1) == 0) continue;
-
+            if (read(0, &two_chars[0], 1) != 1) return 0;
+            if (read(0, &two_chars[1], 1) != 1) return 0;
+            
             if (two_chars[0] == '[') {
                 switch(two_chars[1]) {
-                case'A': e.row = e.row - 1;
-                case'B': e.row = e.row + 1;
-                case'C': e.col = e.col + 1;
-                case'D': e.col = e.col - 1;
+                // Break is hit regardless everytime to stop bouncing cursor behaviour
+                case'A': if (e.row > 1) e.row = e.row - 1; break;
+                case'B': if (e.row < d.nlines) e.row = e.row + 1; break;
+            
+                // If the current column num is less then the len of the string 
+                // in the current row, then we can move the cursor to the right
+                case'C': if (e.col < strlen(d.lines[e.row-1])) e.col = e.col + 1; break;
+                case'D': if (e.col > 1) e.col = e.col - 1; break;
                 }
             }
         }
-        printf("value of row: %d, col %d\n", e.row, e.col);
+        render_display(&d, &e);
+        // printf("value of row: %d, col %d\n", e.row, e.col);
         
     }
 
@@ -110,13 +136,18 @@ void render_display(document *d, editor *e) {
         size++;
     }
 
+    // Recalculates the col num if the row has changed and the len of 
+    // the string in the new row is less then the current col num
+    if (strlen(d->lines[e->row-1]) < e->col)
+        e->col = strlen(d->lines[e->row-1]);
+
     // Make a string for moving the cursor and unhiding it and add it to the end 
-    int n = snprintf(buffer + size, capacity - size, "\x1b[%d;%d\x1b[?25h", e->row, e->col);
+    int n = snprintf(buffer + size, capacity - size, "\x1b[%d;%dH\x1b[?25h", e->row, e->col);
     // If n is less then cap - size, then there wasn't enough space to write full string
     if (n >= capacity - size) {
         // Double cap size and rewrite string again
         capacity *= 2;
-        n = snprintf(buffer + size, capacity - size, "\x1b[%d;%d\x1b[?25h", e->row, e->col);
+        n = snprintf(buffer + size, capacity - size, "\x1b[%d;%dH\x1b[?25h", e->row, e->col);
     }
     // Assign n to the size of the buffer and away we go
     size += n;
