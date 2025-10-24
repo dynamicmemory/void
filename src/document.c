@@ -85,7 +85,7 @@ int read_doc(document *d) {
         copy = strdup(line);
         if (copy == NULL) goto cleanup;
         int len = strlen(copy);
-        copy[len-1] = '\0';
+        if (len > 0 && copy[len-1] == '\n') copy[len-1] = '\0';
 
         if (d->nlines == d->capacity) {
             // Double capacity if not 0 otherwise add 1 to avoid 0 from multi
@@ -100,8 +100,18 @@ int read_doc(document *d) {
         d->nlines += 1;
         line = NULL;
     }
+
+    if (d->nlines == 0) {
+        d->lines = malloc(sizeof(char *));
+        if (!d->lines) return -1;
+        d->lines[0] = strdup("");
+        if (!d->lines[0]) return -1;
+        d->nlines = 1;
+        d->capacity = 1;
+    }
+
     // Free the last line read in to avoid a memory leak if file isnt empty
-    if (d->nlines) free(line);
+    free(line);
     fclose(fd);
     return 0;
 
