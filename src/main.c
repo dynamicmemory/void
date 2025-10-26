@@ -104,23 +104,26 @@ void backspace(document *d, editor *e) {
 
     if (e->row > 1 && e->col == 1) {
         e->row = e->row-1;
-        e->col = strlen(d->lines[e->row-1]);
+        e->col = strlen(d->lines[e->row-1])+1;
         row--;
         col--;
 
-        // char *line = d.lines[row+1];
-        // size_t len = strlen(line);
-        // line = realloc(line, len - 1);
-        // d.lines[row] = line;
-        // memmove(line + col-1, line + col, len - 1 - col);
+        // Get pointers for the previous and current line, and their lengths
+        char *prev_line = d->lines[row-1];
+        size_t prev_len = strlen(prev_line)+1;
+        char *curr_line = d->lines[row];
+        size_t curr_len = strlen(curr_line)+1;
+
+        prev_line = realloc(prev_line, prev_len + curr_len);
+        memmove(prev_line + prev_len-1, curr_line, curr_len);
+        // free(curr_line);
+        d->nlines--;
     }
     else if (e->col > 1) {
-        // char *line = d.lines[row];
-        // size_t len = strlen(line);
-        // line = realloc(line, len - 1);
-        // d.lines[row] = line;
-        // memmove(line + col-1, line + col, len - 1 - col);
-        e->col = e->col-1;
+        char *line = d->lines[row];
+        size_t len = strlen(line)+1;
+        memmove(line + col-1, line + col, len-col+1);
+        e->col--;
     }
 }
 
@@ -141,6 +144,8 @@ void move_cursor(document *d, editor *e) {
     if (read(0, &two_chars[1], 1) != 1) exit(1);
 
     if (two_chars[0] == '[') {
+        int row = e->row-1;
+        int col = e->col-1;
         switch(two_chars[1]) {
             // Break is hit regardless everytime to stop bouncing cursor behaviour
             case'A': if (e->row > 1) e->row = e->row - 1; break;
@@ -148,7 +153,7 @@ void move_cursor(document *d, editor *e) {
 
             // If the current column num is less then the len of the string 
             // in the current row, then we can move the cursor to the right
-            case'C': if (e->col < strlen(d->lines[e->row-1])) e->col = e->col + 1; break;
+            case'C': if (e->col < strlen(d->lines[e->row-1])+1) e->col = e->col + 1; break;
             case'D': if (e->col > 1) e->col = e->col - 1; break;
         }
     }
