@@ -16,6 +16,7 @@ int save_doc(document *d);
 int init_doc(document *d, char **arg) {
     d->lines = NULL;
     d->capacity = 0;
+    d->nlines = 0;
     if (init_name(d, arg) == -1) return -1;
     if (read_doc(d) == -1) return -1;
 
@@ -97,7 +98,7 @@ int read_doc(document *d) {
         }
         // Copy the line into the next line in the array of lines  
         d->lines[d->nlines] = copy;
-        d->nlines += 1;
+        d->nlines++;
         line = NULL;
     }
 

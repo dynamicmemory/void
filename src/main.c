@@ -19,8 +19,8 @@ typedef struct editor {
 } editor;
 
 void init_editor(editor *e) {
-    e->row = 1;
-    e->col = 1;
+    e->row = 0;
+    e->col = 0;
 }
 
 // Move to display.c file when finished
@@ -80,8 +80,8 @@ int main(int argc, char *argv[]) {
 /* Inserts the character typed on the keyboard into the document at the cursors 
  * current location */
 void input_char(document *d, editor *e, char c) {
-    int row = e->row-1;
-    int col = e->col-1;
+    int row = e->row;
+    int col = e->col;
     char *line = d->lines[row];
     size_t len = strlen(line);
 
@@ -97,32 +97,30 @@ void input_char(document *d, editor *e, char c) {
 
 }
 
+// TODO: Make variables instead of calls to everything everytime
 /* Logic for when the backspace key is pressed on the keyboard*/
 void backspace(document *d, editor *e) {
-    int row = e->row-1;
-    int col = e->col-1;
 
-    if (e->row > 1 && e->col == 1) {
-        e->row = e->row-1;
-        e->col = strlen(d->lines[e->row-1])+1;
-        row--;
-        col--;
+    if (e->row > 0 && e->col == 0) {
+        size_t plen = strlen(d->lines[e->row-1]);
+        d->lines[e->row-1] = realloc(d->lines[e->row-1], 
+                                     plen+1 + 
+                                     strlen(d->lines[e->row]+1));
 
-        // Get pointers for the previous and current line, and their lengths
-        char *prev_line = d->lines[row-1];
-        size_t prev_len = strlen(prev_line)+1;
-        char *curr_line = d->lines[row];
-        size_t curr_len = strlen(curr_line)+1;
-
-        prev_line = realloc(prev_line, prev_len + curr_len);
-        memmove(prev_line + prev_len-1, curr_line, curr_len);
-        // free(curr_line);
+        strcat(d->lines[e->row-1], d->lines[e->row]);
+        free(d->lines[e->row]);
+        memmove(&d->lines[e->row], 
+                &d->lines[e->row+1], 
+                sizeof(char*) * (d->nlines - e->row - 1));
+        
         d->nlines--;
+        e->row--;
+        e->col = plen;
     }
-    else if (e->col > 1) {
-        char *line = d->lines[row];
+    else if (e->col > 0) {
+        char *line = d->lines[e->row];
         size_t len = strlen(line)+1;
-        memmove(line + col-1, line + col, len-col+1);
+        memmove(line + e->col-1, line + e->col, len-e->col);
         e->col--;
     }
 }
@@ -131,7 +129,7 @@ void backspace(document *d, editor *e) {
 void enter(document *d, editor *e) {
     if (d->nlines != e->row) {
         e->row++;
-        e->col = 1;
+        e->col = 0;
     }
 }
 
@@ -144,17 +142,14 @@ void move_cursor(document *d, editor *e) {
     if (read(0, &two_chars[1], 1) != 1) exit(1);
 
     if (two_chars[0] == '[') {
-        int row = e->row-1;
-        int col = e->col-1;
         switch(two_chars[1]) {
             // Break is hit regardless everytime to stop bouncing cursor behaviour
-            case'A': if (e->row > 1) e->row = e->row - 1; break;
-            case'B': if (e->row < d->nlines) e->row = e->row + 1; break;
-
-            // If the current column num is less then the len of the string 
-            // in the current row, then we can move the cursor to the right
-            case'C': if (e->col < strlen(d->lines[e->row-1])+1) e->col = e->col + 1; break;
-            case'D': if (e->col > 1) e->col = e->col - 1; break;
+            case'A': if (e->row > 0) e->row--; break;
+            // -1 on nlines as lines start at 1 not 0 like e->row
+            case'B': if (e->row < d->nlines-1) e->row++; break;
+            // +1 for \0 terminator
+            case'C': if (e->col < strlen(d->lines[e->row])+1) e->col++; break;
+            case'D': if (e->col > 0) e->col--; break;
         }
     }
 }
@@ -195,17 +190,17 @@ void render_display(document *d, editor *e) {
 
     // Recalculates the col num if the row has changed and the len of 
     // the string in the new row is less then the current col num
-    if (strlen(d->lines[e->row-1]) < e->col-1)
-        e->col = strlen(d->lines[e->row-1]);
+    if (strlen(d->lines[e->row]) < e->col)
+        e->col = strlen(d->lines[e->row]);
 
     // Make a string for moving the cursor and unhiding it and add it to the end 
-    int n = snprintf(buffer + size, capacity - size, "\x1b[%d;%dH\x1b[?25h", e->row, e->col);
+    int n = snprintf(buffer + size, capacity - size, "\x1b[%d;%dH\x1b[?25h", e->row+1, e->col+1);
     // If n is less then cap - size, then there wasn't enough space to write full string
     if (n >= capacity - size) {
         // Double cap size and rewrite string again
         capacity *= 2;
         buffer = realloc(buffer, capacity);
-        n = snprintf(buffer + size, capacity - size, "\x1b[%d;%dH\x1b[?25h", e->row, e->col);
+        n = snprintf(buffer + size, capacity - size, "\x1b[%d;%dH\x1b[?25h", e->row+1, e->col+1);
     }
     // Assign n to the size of the buffer and away we go
     size += n;
