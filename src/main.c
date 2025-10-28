@@ -62,14 +62,14 @@ int main(int argc, char *argv[]) {
     }
 
     // --- TODO ---
-    // Read in a file  DONE  
-    // Store it in a buffer  DONE
-    // Print it to the screen  DONE 
+    // Read in a file                     DONE  
+    // Store it in a buffer               DONE
+    // Print it to the screen             DONE 
     // Breakout of standard terminal mode DONE
-    // Move cursor around screen DONE
-    // add chars to lines DONE
-    // backspace chars 
-    // Enter new lines 
+    // Move cursor around screen          DONE
+    // add chars to lines                 DONE
+    // backspace chars                    DONE
+    // Enter new lines                    DONE
     // Viewport adjustment
     // status bar
     // Finally new features
@@ -100,21 +100,25 @@ void input_char(document *d, editor *e, char c) {
 // TODO: Make variables instead of calls to everything everytime
 /* Logic for when the backspace key is pressed on the keyboard*/
 void backspace(document *d, editor *e) {
-
     if (e->row > 0 && e->col == 0) {
         size_t plen = strlen(d->lines[e->row-1]);
+
+        // TODO: Add null check for realloc
         d->lines[e->row-1] = realloc(d->lines[e->row-1], 
                                      plen+1 + 
                                      strlen(d->lines[e->row]+1));
 
+        // Combined current line and prev line into one
         strcat(d->lines[e->row-1], d->lines[e->row]);
         free(d->lines[e->row]);
+
+        // TODO: Add null check for memmove
         memmove(&d->lines[e->row], 
                 &d->lines[e->row+1], 
                 sizeof(char*) * (d->nlines - e->row - 1));
         
-        d->nlines--;
-        e->row--;
+        d->nlines--; 
+        e->row--; 
         e->col = plen;
     }
     else if (e->col > 0) {
@@ -125,12 +129,30 @@ void backspace(document *d, editor *e) {
     }
 }
 
+// TODO: Write error handling and NULL checks for all memops
 /* Logic for what happens when a newline is entered on the keyboard*/
 void enter(document *d, editor *e) {
-    if (d->nlines != e->row) {
-        e->row++;
-        e->col = 0;
-    }
+    // Increase size of the lines buffer by 1
+    d->lines = realloc(d->lines, sizeof(char*) * (d->nlines+1));
+
+    // Everything at the cursor on to its right is assigned this pointer
+    char *right = strdup(&d->lines[e->row][e->col]);
+
+    // Shift all lines below the current one, one more down
+    memmove(&d->lines[e->row+2], 
+            &d->lines[e->row+1], 
+            sizeof(char*) * (d->nlines-1 - e->row));
+
+    // Null terminate the current line at the cursor (small memory misstep but its ok)
+    d->lines[e->row][e->col] = '\0';
+
+    // Assign the line below that right pointer we made earlier
+    d->lines[e->row+1] = right;
+
+    // increment everything
+    d->nlines++;
+    e->row++;
+    e->col = 0;
 }
 
 // TODO: Error handling plus remove the exit() on fail, return error code
