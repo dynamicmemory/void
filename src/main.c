@@ -1,3 +1,15 @@
+// --- TODO ---
+// Read in a file                     DONE  
+// Store it in a buffer               DONE
+// Print it to the screen             DONE 
+// Breakout of standard terminal mode DONE
+// Move cursor around screen          DONE
+// add chars to lines                 DONE
+// backspace chars                    DONE
+// Enter new lines                    DONE
+// Viewport adjustment
+// status bar
+// Finally new features
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,6 +17,9 @@
 #include <unistd.h>
 #include "../include/document.h"
 #include "../include/terminal.h"
+
+// For terminal window size 
+#include <sys/ioctl.h>
 
 #define CTRL_QUIT 17
 #define CTRL_SAVE 19
@@ -16,17 +31,29 @@
 typedef struct editor {
     int row;
     int col;
+    int row_offset;
+    int col_offset;
+    int screen_rows;
+    int screen_cols;
 } editor;
+
+struct winsize ws;
 
 void init_editor(editor *e) {
     e->row = 0;
     e->col = 0;
+    ioctl(0, TIOCGWINSZ, &ws);
+    e->screen_rows = ws.ws_row;
+    e->screen_cols = ws.ws_col;
 }
 
 // Move to display.c file when finished
 void render_display(document *d, editor *e);
+void update_viewport(document *d, editor *e);
+
 
 // Move to input.c file when finished
+void input_handler(document *d, editor *e, char c);
 void input_char(document *d, editor *e, char c);
 void backspace(document *d, editor *e);
 void enter(document *d, editor *e);
@@ -52,28 +79,24 @@ int main(int argc, char *argv[]) {
 
     char c;
     while (read(0, &c, 1) == 1) {
-        if (c == CTRL_QUIT) exit(0);
-        if (c == CTRL_SAVE) save_doc(&d);  
-        if (c >= 32 && c <= 126) input_char(&d, &e, c);
-        if (c == BACKSPACE) backspace(&d, &e);
-        if (c == ENTER) enter(&d, &e);
-        if (c == '\x1b') move_cursor(&d, &e);
+        input_handler(&d, &e, c);
         render_display(&d, &e);
     }
-
-    // --- TODO ---
-    // Read in a file                     DONE  
-    // Store it in a buffer               DONE
-    // Print it to the screen             DONE 
-    // Breakout of standard terminal mode DONE
-    // Move cursor around screen          DONE
-    // add chars to lines                 DONE
-    // backspace chars                    DONE
-    // Enter new lines                    DONE
-    // Viewport adjustment
-    // status bar
-    // Finally new features
     return 0;
+}
+
+
+/* ----------------- INPUT RELATED CODE --------------------- */
+
+/* Handles all input from the keyboard and redirects it to its corresponding 
+ * function. */
+void input_handler(document *d, editor *e, char c) {
+        if (c == CTRL_QUIT) exit(0);
+        if (c == CTRL_SAVE) save_doc(d);  
+        if (c >= 32 && c <= 126) input_char(d, e, c);
+        if (c == BACKSPACE) backspace(d, e);
+        if (c == ENTER) enter(d, e);
+        if (c == '\x1b') move_cursor(d, e);
 }
 
 // TODO: ERROR handling alloc and memmove
@@ -94,7 +117,6 @@ void input_char(document *d, editor *e, char c) {
 
     line[col] = c; 
     e->col++;
-
 }
 
 // TODO: Make variables instead of calls to everything everytime
@@ -176,56 +198,69 @@ void move_cursor(document *d, editor *e) {
     }
 }
 
-// The current bug has to do with doubling capacity, when we realloc, something 
-// breaks, same with version 1, the problem just doesnt appear there because I 
-// initialize that buffer with a huge number of bytes, where here its just 256
+
+/* ----------------- DISPLAY/RENDER RELATED CODE --------------------- */
+
+// TODO: Refactor this code into smaller pieces.
 // TODO: ADD ERROR CHECKING AND HANDLING TO THIS
 void render_display(document *d, editor *e) {
-    long capacity = 256;
+    long capacity = 64;
     char *buffer= malloc(capacity);
 
     // Chars for hiding the cursor, moving it to the top and clearing the screen
     char *escapesec = "\x1b[?25l\x1b[H\x1b[2J";
-    int esc_len = strlen(escapesec);
-    memcpy(buffer, escapesec, esc_len);
+    size_t size = strlen(escapesec);
+    memcpy(buffer, escapesec, size);
 
-    size_t size = esc_len;
     for (int i = 0; i < d->nlines; i++) {
         char *p = d->lines[i]; 
         while (*p) {
             // Increase buffer size if it runs out
-            if (size + 3 >= capacity) {
+            if (size >= capacity) {
                 capacity *= 2;
-                buffer = realloc(buffer, capacity);
+                char *tmp = realloc(buffer, sizeof(char) * capacity);
+                if (!tmp) exit(1);
+                buffer = tmp;
             }
-
             // Write each line to the buffer
-            buffer[size] = *p;
-            size++;
-            p++;
+            buffer[size++] = *p++;
         }
-        buffer[size] = '\r';
-        size++;
-        buffer[size] = '\n';
-        size++;
+        // Must check size again otherwise we can stumble over the malloced memory
+        if (size >= capacity) {
+            capacity *= 2;
+            char *tmp = realloc(buffer, sizeof(char) * capacity);
+            if (!tmp) exit(1);
+            buffer = tmp;
+        }
+        // Add the return and newline char to the end of the line 
+        buffer[size++] = '\r';
+        buffer[size++] = '\n';
     }
-
     // Recalculates the col num if the row has changed and the len of 
     // the string in the new row is less then the current col num
     if (strlen(d->lines[e->row]) < e->col)
         e->col = strlen(d->lines[e->row]);
 
-    // Make a string for moving the cursor and unhiding it and add it to the end 
-    int n = snprintf(buffer + size, capacity - size, "\x1b[%d;%dH\x1b[?25h", e->row+1, e->col+1);
-    // If n is less then cap - size, then there wasn't enough space to write full string
-    if (n >= capacity - size) {
-        // Double cap size and rewrite string again
+    // Must check size again otherwise we can stumble over the malloced memory
+    if (size >= capacity) {
         capacity *= 2;
-        buffer = realloc(buffer, capacity);
-        n = snprintf(buffer + size, capacity - size, "\x1b[%d;%dH\x1b[?25h", e->row+1, e->col+1);
+        char *tmp = realloc(buffer, sizeof(char) * capacity);
+        if (!tmp) exit(1);
+        buffer = tmp;
     }
+    // Double cap size and rewrite string again
+    int n = snprintf(buffer + size, capacity - size, 
+                 "\x1b[%d;%dH\x1b[?25h", 
+                 e->row+1, e->col+1);
+
     // Assign n to the size of the buffer and away we go
     size += n;
 
     write(STDOUT_FILENO, buffer, size);
+}
+
+/* Calculates which rows/cols of the file should be shown in the terminal 
+ * window, depending on where the user currently is in the file */
+void update_viewport(document *d, editor *e) {
+
 }
