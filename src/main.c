@@ -42,6 +42,8 @@ struct winsize ws;
 void init_editor(editor *e) {
     e->row = 0;
     e->col = 0;
+    e->row_offset = 0;
+    e->col_offset = 0;
     ioctl(0, TIOCGWINSZ, &ws);
     e->screen_rows = ws.ws_row;
     e->screen_cols = ws.ws_col;
@@ -198,7 +200,9 @@ void move_cursor(document *d, editor *e) {
     }
 }
 
-
+// row_offset = e->row - screen_height;
+// if neg continue, else 
+// display lines from buffer that are d->lines[nlines + offset]  
 /* ----------------- DISPLAY/RENDER RELATED CODE --------------------- */
 
 // TODO: Refactor this code into smaller pieces.
@@ -212,9 +216,28 @@ void render_display(document *d, editor *e) {
     size_t size = strlen(escapesec);
     memcpy(buffer, escapesec, size);
 
-    for (int i = 0; i < d->nlines; i++) {
-        char *p = d->lines[i]; 
-        while (*p) {
+    /* Offset calcs for view port, move to func after finished */ 
+    // TODO: Turn back into turnary op when finsihed
+    if (e->row + e->row_offset < e->screen_rows) 
+        e->row_offset = 0;
+    else if (e->row + e->row_offset >= e->screen_rows)
+        e->row_offset = e->row - e->screen_rows;
+    // col offset calcs
+    if (e->col + e->col_offset < e->screen_cols) 
+        e->col_offset = 0;
+    else if (e->col + e->col_offset >= e->screen_cols)
+        e->col_offset = e->col - e->screen_cols;
+
+    for (int i = 0; i < e->screen_rows; i++) {         // cant compare to dnlines
+        if (i + e->row_offset >= d->nlines) break;
+        char *p = d->lines[i + e->row_offset];    // check for lines row existing 
+
+        // col specific viewport code 
+        int line_len = strlen(p);
+        int stop = e->col_offset + e->screen_cols;
+        if (e->col_offset + e->screen_cols > line_len) stop = line_len; 
+        for (int j = e->col_offset; j < stop; j++) {
+        // while (*p) {
             // Increase buffer size if it runs out
             if (size >= capacity) {
                 capacity *= 2;
@@ -223,10 +246,10 @@ void render_display(document *d, editor *e) {
                 buffer = tmp;
             }
             // Write each line to the buffer
-            buffer[size++] = *p++;
+            buffer[size++] = p[j];
         }
         // Must check size again otherwise we can stumble over the malloced memory
-        if (size >= capacity) {
+        if (size + 2 >= capacity) {
             capacity *= 2;
             char *tmp = realloc(buffer, sizeof(char) * capacity);
             if (!tmp) exit(1);
@@ -236,13 +259,14 @@ void render_display(document *d, editor *e) {
         buffer[size++] = '\r';
         buffer[size++] = '\n';
     }
+
     // Recalculates the col num if the row has changed and the len of 
     // the string in the new row is less then the current col num
     if (strlen(d->lines[e->row]) < e->col)
         e->col = strlen(d->lines[e->row]);
 
     // Must check size again otherwise we can stumble over the malloced memory
-    if (size >= capacity) {
+    if (size + 32 >= capacity) {
         capacity *= 2;
         char *tmp = realloc(buffer, sizeof(char) * capacity);
         if (!tmp) exit(1);
@@ -251,11 +275,10 @@ void render_display(document *d, editor *e) {
     // Double cap size and rewrite string again
     int n = snprintf(buffer + size, capacity - size, 
                  "\x1b[%d;%dH\x1b[?25h", 
-                 e->row+1, e->col+1);
+                 e->row+1, e->col+1 - e->col_offset);        // cant even tell if - or + offset
 
     // Assign n to the size of the buffer and away we go
     size += n;
-
     write(STDOUT_FILENO, buffer, size);
 }
 
