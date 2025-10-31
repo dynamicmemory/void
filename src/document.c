@@ -7,6 +7,7 @@ typedef struct document {
     char *dname;
     int nlines;
     int capacity;
+    int dirty;
 } document;
 
 int init_name(document *d, char **args);
@@ -17,6 +18,7 @@ int init_doc(document *d, char **arg) {
     d->lines = NULL;
     d->capacity = 0;
     d->nlines = 0;
+    d->dirty = 0;
     if (init_name(d, arg) == -1) return -1;
     if (read_doc(d) == -1) return -1;
 
@@ -145,5 +147,6 @@ int save_doc(document *d) {
     }
 
     fclose(fd);
+    d->dirty = 0;
     return 0;
 }

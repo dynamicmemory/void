@@ -7,8 +7,9 @@
 // add chars to lines                 DONE
 // backspace chars                    DONE
 // Enter new lines                    DONE
-// Viewport adjustment
-// status bar
+// Viewport adjustment                DONE 
+// status bar                         DONE
+// Adjust on resize
 // Finally new features
 #include <stddef.h>
 #include <stdio.h>
@@ -52,6 +53,7 @@ void init_editor(editor *e) {
 // Move to display.c file when finished
 void render_display(document *d, editor *e);
 void update_viewport(document *d, editor *e);
+void render_status_bar(document *d, editor *e, char *f, int capacity, size_t g);
 
 
 // Move to input.c file when finished
@@ -119,6 +121,7 @@ void input_char(document *d, editor *e, char c) {
 
     line[col] = c; 
     e->col++;
+    d->dirty++;
 }
 
 // TODO: Make variables instead of calls to everything everytime
@@ -151,6 +154,7 @@ void backspace(document *d, editor *e) {
         memmove(line + e->col-1, line + e->col, len-e->col);
         e->col--;
     }
+    d->dirty++;
 }
 
 // TODO: Write error handling and NULL checks for all memops
@@ -177,6 +181,7 @@ void enter(document *d, editor *e) {
     d->nlines++;
     e->row++;
     e->col = 0;
+    d->dirty++;
 }
 
 // TODO: Error handling plus remove the exit() on fail, return error code
@@ -192,7 +197,11 @@ void move_cursor(document *d, editor *e) {
             // Break is hit regardless everytime to stop bouncing cursor behaviour
             case'A': if (e->row > 0) e->row--; break;
             // -1 on nlines as lines start at 1 not 0 like e->row
-            case'B': if (e->row < d->nlines-1) e->row++; break;
+            case'B': if (e->row < d->nlines-1) e->row++; 
+                     // This lines runs the cursor to the end of the last line 
+                     // if you continue to hold the down arrow on the last line.
+                     else if (e->col < strlen(d->lines[e->row])+1) e->col++;
+                     break;
             // +1 for \0 terminator
             case'C': if (e->col < strlen(d->lines[e->row])+1) e->col++; break;
             case'D': if (e->col > 0) e->col--; break;
@@ -200,9 +209,6 @@ void move_cursor(document *d, editor *e) {
     }
 }
 
-// row_offset = e->row - screen_height;
-// if neg continue, else 
-// display lines from buffer that are d->lines[nlines + offset]  
 /* ----------------- DISPLAY/RENDER RELATED CODE --------------------- */
 
 // TODO: Refactor this code into smaller pieces.
@@ -218,17 +224,20 @@ void render_display(document *d, editor *e) {
 
     /* Offset calcs for view port, move to func after finished */ 
     // TODO: Turn back into turnary op when finsihed
-    if (e->row + e->row_offset < e->screen_rows) 
-        e->row_offset = 0;
-    else if (e->row + e->row_offset >= e->screen_rows)
-        e->row_offset = e->row - e->screen_rows;
+    int screen_rows = e->screen_rows-1;
+    if (e->row < e->row_offset) 
+        e->row_offset = e->row;
+    else if (e->row >= e->row_offset + screen_rows) 
+        e->row_offset = e->row - screen_rows+1;
+
     // col offset calcs
     if (e->col + e->col_offset < e->screen_cols) 
         e->col_offset = 0;
     else if (e->col + e->col_offset >= e->screen_cols)
         e->col_offset = e->col - e->screen_cols;
 
-    for (int i = 0; i < e->screen_rows; i++) {         // cant compare to dnlines
+    // Screen rows -1 to make room for the status bar 
+    for (int i = 0; i < e->screen_rows-1; i++) {         // cant compare to dnlines
         if (i + e->row_offset >= d->nlines) break;
         char *p = d->lines[i + e->row_offset];    // check for lines row existing 
 
@@ -257,7 +266,7 @@ void render_display(document *d, editor *e) {
         }
         // Add the return and newline char to the end of the line 
         buffer[size++] = '\r';
-        buffer[size++] = '\n';
+        if (i < e->screen_rows - 1) buffer[size++] = '\n'; // Dont print nl on last line
     }
 
     // Recalculates the col num if the row has changed and the len of 
@@ -265,17 +274,58 @@ void render_display(document *d, editor *e) {
     if (strlen(d->lines[e->row]) < e->col)
         e->col = strlen(d->lines[e->row]);
 
+
+
+    // ----------- CODE FOR THE STATUS BAR ---------------
+    // render_status_bar(d, e, buffer, capacity, size);
+
     // Must check size again otherwise we can stumble over the malloced memory
-    if (size + 32 >= capacity) {
+    if (size + 512 >= capacity) {
         capacity *= 2;
         char *tmp = realloc(buffer, sizeof(char) * capacity);
         if (!tmp) exit(1);
         buffer = tmp;
     }
+
+    size += snprintf(buffer+size, capacity-size, "\x1b[%d;%dH", e->screen_rows, 0);
+    size += snprintf(buffer+size, capacity-size, "\x1b[1;30;46m");
+    
+    char left[256];
+    char center[256];
+    char right[256];
+
+    int l_len = snprintf(left, sizeof(left), "%s %s",d->dname, d->dirty > 0 ? "*" : " ");
+    int c_len= snprintf(center, sizeof(center), " --VOID-- ");
+    int r_len = snprintf(right, sizeof(right), "line %d, col %d",e->row, e->col);
+   
+    int remaining = e->screen_cols - (l_len + c_len + r_len);
+    int l_pad = remaining / 2;
+    int r_pad = remaining - l_pad;
+
+    size += snprintf(buffer+size, capacity-size, "%s", left);
+    for (int i = 0; i < l_pad; i++)
+        size += snprintf(buffer+size, capacity-size, " ");
+    size += snprintf(buffer+size, capacity-size, "%s", center);
+    for (int i = 0; i < r_pad; i++)
+        size += snprintf(buffer+size, capacity-size, " ");
+    size += snprintf(buffer+size, capacity-size, "%s", right);
+    
+    size += snprintf(buffer+size, capacity-size, "\x1b[0m");
+
+    // ------------- FINAL CURSOR CALCULATIONS ------------------
+    if (size + 64 >= capacity) {
+        capacity *= 2;
+        char *tmp = realloc(buffer, sizeof(char) * capacity);
+        if (!tmp) exit(1);
+        buffer = tmp;
+    }
+
+    int cursor_row = e->row+1 - e->row_offset;
+    cursor_row = cursor_row > e->screen_rows-1 ? e->screen_rows-1 : cursor_row;
     // Double cap size and rewrite string again
     int n = snprintf(buffer + size, capacity - size, 
                  "\x1b[%d;%dH\x1b[?25h", 
-                 e->row+1, e->col+1 - e->col_offset);        // cant even tell if - or + offset
+                 cursor_row, e->col+1 - e->col_offset); 
 
     // Assign n to the size of the buffer and away we go
     size += n;
@@ -285,5 +335,18 @@ void render_display(document *d, editor *e) {
 /* Calculates which rows/cols of the file should be shown in the terminal 
  * window, depending on where the user currently is in the file */
 void update_viewport(document *d, editor *e) {
+
+}
+
+void render_status_bar(document *d, editor *e, char *buffer, int capacity, size_t size) {
+    // Change colour 
+    // *off += snprintf(outbuff + *off, RENDERBUFF - *off, "\x1b[1;30;46m");
+    // Get screen width 
+    // divide screen into three sections 
+    // write the filename and the dirty symbol on the left 
+    // write void in the center 
+    // write row and col in the right 
+    // change colour back 
+    // Thats it 
 
 }

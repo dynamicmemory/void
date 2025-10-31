@@ -16,6 +16,7 @@ typedef struct document {
     char *dname;
     int nlines;
     int capacity;
+    int dirty;
 } document;
 
 int init_doc(document *d, char **args);
