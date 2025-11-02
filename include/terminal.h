@@ -10,7 +10,16 @@
  *
  */ 
 
+// Termios function headers
 void disableRaw();
 void enableRaw();
+
+void get_window_size(int *r, int *c);
+
+// Resize function headers 
+void install_winch_handler(void);
+int read_key(void);
+int get_resized(void);
+void clear_resized_flag(void);
 
 #endif 

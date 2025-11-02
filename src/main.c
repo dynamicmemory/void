@@ -1,4 +1,3 @@
-#include <stddef.h>
 #include <stdio.h>
 #include <unistd.h>
 #include "../include/document.h"
@@ -9,6 +8,7 @@
 int main(int argc, char *argv[]) {
     // Set the terminal into raw mode 
     enableRaw();
+    install_winch_handler();
 
     if (argc > 2) {
         perror("Usage: Only enter one filename");
@@ -24,12 +24,20 @@ int main(int argc, char *argv[]) {
     init_editor(&e);
     screen s; 
     init_screen(&s);
-    render_screen(&d, &e, &s);
 
-    char c;
-    while (read(0, &c, 1) == 1) {
-        input_handler(&d, &e, c);
+    while (1) {
+        if (get_resized()) {
+            clear_resized_flag();
+            render_screen(&d, &e, &s);
+        }
+
+        // Reads a single key input or gets interupted to resize
+        int c = read_key();
+        if (c == -1) continue;
+
+        input_handler(&d, &e, (char)c);
         render_screen(&d, &e, &s);
+
     }
     return 0;
 }

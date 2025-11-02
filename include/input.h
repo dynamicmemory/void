@@ -7,18 +7,15 @@
  * input.h
  *
  * Defines the input management for the text editor:
- * - init_doc: initializes the file passed in for editing or creates a files. 
- * - init_name: initializes the files name passed in for editing or creates a files. 
- * - read_doc: Reads the contents of the file into the file buffer.
- * - save_doc: Saves the contents of the file buffer back into the file.
+ * - init_editor: initializes the the editor struct controlling the rows and cols 
+ *   of the editor. 
+ * - input_handler: initializes the files name passed in for editing or creates a files. 
  */ 
 typedef struct {
     int row;
     int col;
     int row_offset;
     int col_offset;
-    int screen_rows;
-    int screen_cols;
 } editor;
 
 // Move to input.c file when finished

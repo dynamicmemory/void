@@ -22,12 +22,14 @@ typedef struct {
     size_t cap;
     size_t size;
     char *buff; 
+    int screen_rows;
+    int screen_cols;
 } screen;
 
 // Move to display.c file when finished
 void init_screen(screen *s);
 void render_screen(document *d, editor *e, screen *s);
-void update_viewport(document *d, editor *e);
+void update_viewport(editor *e, screen*s);
 void adjust_buff_size(screen *s, int limit);
 void write_to_buff(screen *s, char *data, int len);
 void render_status_bar(document *d, editor *e, screen *s);

@@ -1,10 +1,6 @@
 # Current project binary
-void
-test
-main
+./build/*
 
 # Any text files generated during testing 
 *.txt
-
-src/newvoid*
 
