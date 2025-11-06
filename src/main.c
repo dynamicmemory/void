@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include "../include/document.h"
 #include "../include/terminal.h"
@@ -39,5 +40,7 @@ int main(int argc, char *argv[]) {
         render_screen(&d, &e, &s);
 
     }
+    free(s.buff);
+    // TODO: We might need to free other things, remember to check this eventually
     return 0;
 }

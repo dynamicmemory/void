@@ -11,9 +11,13 @@
 #define CURSOR_HIDE_CLEAR "\x1b[?25l\x1b[H\x1b[2J"
 #define CURSOR_BOTTOM_ROW "\x1b[%d;%dH"
 #define STATUS_BAR_COLOUR "\x1b[1;30;46m"
+#define LINE_NUM_COLOUR "\x1b[38;5;240m"
+#define ROW_COLOUR "\x1b[15;5;240m"
 #define CURSOR_RESTORE "\x1b[%d;%dH\x1b[?25h" 
 #define RESTORE_COLOUR "\x1b[0m"
 #define MIN(a,b) ((a)<(b)?(a):(b))
+#define GUTTER "      "   // Hard code for now 
+#define GUTTER_SIZE 6    // Hard code for now
 
 /* initializes the screen rendering structure */
 void init_screen(screen *s) {
@@ -34,12 +38,15 @@ void render_screen(document *d, editor *e, screen *s) {
     
     // Screen rows -1 to make room for the status bar 
     for (int i = 0; i < s->screen_rows-1; i++) { 
-        if (i + e->row_offset >= d->nlines) 
+        if (i + e->row_offset >= d->nlines) {
+            write_to_buff(s, GUTTER, GUTTER_SIZE);
             write_to_buff(s, "~\r\n", 3); 
+        }
         else { 
+            write_line_numbers(s, e, i);
             char *p = d->lines[i + e->row_offset]; // show lines within range 
             // clamping for cols, either str length or offset depending on size 
-            int stop = MIN((int)strlen(p), e->col_offset + s->screen_cols); 
+            int stop = MIN((int)strlen(p), e->col_offset + (s->screen_cols - GUTTER_SIZE)); 
             for (int j = e->col_offset; j < stop; j++) 
                 write_to_buff(s, &p[j], 1); 
             // Dont print nl if its the last line of screen (-1 for status bar) 
@@ -52,8 +59,8 @@ void render_screen(document *d, editor *e, screen *s) {
     render_status_bar(d, e, s); 
 
     adjust_buff_size(s, 64); 
-    int c_col = e->col+1 - e->col_offset; 
-    int c_row = e->row+1 - e->row_offset; 
+    int c_col = (e->col+1 - e->col_offset) + GUTTER_SIZE;  // The +1 aligns row=0 to row=1 
+    int c_row = e->row+1 - e->row_offset;  // The +1 aligns col=0 to col=1
     c_row = c_row > s->screen_rows-1 ? s->screen_rows-1 : c_row; 
     s->size += snprintf(s->buff+s->size, s->cap-s->size, CURSOR_RESTORE, c_row, c_col); 
 
@@ -66,16 +73,16 @@ void render_screen(document *d, editor *e, screen *s) {
 void update_viewport(editor *e, screen *s) {
     get_window_size(&s->screen_rows, &s->screen_cols);  // Update screen size
     int screen_rows = s->screen_rows-1;
+    int screen_cols = s->screen_cols - GUTTER_SIZE;
     if (e->row < e->row_offset) 
         e->row_offset = e->row;
     else if (e->row >= e->row_offset + screen_rows) 
         e->row_offset = e->row - screen_rows+1;
-
-    // col offset calcs
-    if (e->col + e->col_offset < s->screen_cols) 
-        e->col_offset = 0;
-    else if (e->col + e->col_offset >= s->screen_cols)
-        e->col_offset = e->col - s->screen_cols;
+ 
+    if (e->col < e->col_offset)
+        e->col_offset = e->col;
+    else if (e->col >= e->col_offset + screen_cols)
+        e->col_offset = e->col - screen_cols + 1;
 }
 
 /* Checks how close the screen buffer is to being at max capacity, automatically
@@ -97,6 +104,30 @@ void write_to_buff(screen *s, char *data, int len) {
     memcpy(s->buff + s->size, data, len);
     s->size += len;
 }
+
+// TODO: This function is more complicated then it needs to be, sort it
+/* Helper function that calculates the gutter size and formats the line numbers 
+ * that are printed in the gutter */ 
+void write_line_numbers(screen *s, editor *e, int i) {
+    // TODO: +23 for all the esc chars and potential num size, fix it
+    char line_num[GUTTER_SIZE+23];     
+    int row_num = e->row - e->row_offset;
+    // Sets the num to be relative to the current line, *-1 to fix negatives
+    int num = (row_num-i < 0) ? (row_num-i)*-1 : row_num-i; 
+    // Dims the number for all rows 
+    char *line_colour = LINE_NUM_COLOUR; 
+                     
+    if (row_num == i) {
+        num = i + e->row_offset + 1;  // Prints the actual row number, not offset
+        line_colour = ROW_COLOUR;     // Changes num to unique colour for cur row
+    }
+
+    // Ugly snprintf that needs optimizing.
+    snprintf(line_num, sizeof(line_num), "%s%*d " RESTORE_COLOUR, line_colour,
+             GUTTER_SIZE - 1, num);
+    write_to_buff(s, line_num, strlen(line_num)); 
+}
+
 
 /* Handles the building and rendering of the status bar on the bottom row of 
  * the text editor */

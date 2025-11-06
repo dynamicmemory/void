@@ -32,6 +32,7 @@ void render_screen(document *d, editor *e, screen *s);
 void update_viewport(editor *e, screen*s);
 void adjust_buff_size(screen *s, int limit);
 void write_to_buff(screen *s, char *data, int len);
+void write_line_numbers(screen *s, editor *e, int i);
 void render_status_bar(document *d, editor *e, screen *s);
 void reset_screen(screen *s);
 
